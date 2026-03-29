@@ -139,8 +139,9 @@ class App(ctk.CTk):
             ("13", "48", 5570), ("51", "55", 445), ("16", "55", 110)
         ]
         for u, v, w in edges:
-            self.graph.add_edge(u, v, weight=w)
-            self.graph.add_edge(v, u, weight=w)
+            time = w / 332.24 
+            self.graph.add_edge(u, v, weight=time)
+            self.graph.add_edge(v, u, weight=time)
 
     
     def draw_graph(self):
@@ -236,7 +237,7 @@ class App(ctk.CTk):
         self.canvas.delete("path")
         if path:
             self.draw_path(path, color="blue")
-            self.result.configure(text=f"{' -> '.join(path)} | Min: {cost}")
+            self.result.configure(text=f"{' -> '.join(path)} | Time: {round(cost,2)} min")
         else:
             self.result.configure(text="No path")
 
@@ -286,7 +287,7 @@ class App(ctk.CTk):
         detour_path, detour_cost = self.a_star(u, v, blocked_edges=self.blocked_edges)
         if detour_path and len(detour_path) > 1:
             self.draw_path(detour_path, color="orange")
-            self.result.configure(text=f"Detour from {u} to {v}: {' -> '.join(detour_path)} | Cost: {detour_cost}")
+            self.result.configure(text=f"Detour from {u} to {v}: {' -> '.join(detour_path)} | Time: {round(detour_cost,2)} min")
         else:
             self.result.configure(text="No alternative path found for this edge")
 
@@ -310,6 +311,8 @@ class App(ctk.CTk):
                 x1, y1 = self.positions[u]
                 x2, y2 = self.positions[v]
                 self.canvas.create_line(x1, y1, x2, y2, fill="red", width=3, tags="blocked_edge")
+            
+        self.result.configure(text=f"Line B nodes: {' -> '.join(self.linja_b_nodes)}")
 
         if hasattr(self, "used_edges"):
             for u, v in self.used_edges:
@@ -328,7 +331,11 @@ class App(ctk.CTk):
             return
 
         nodes_in_path = []
+        total_time = 0
         for u, v in self.used_edges:
+
+            if self.graph.has_edge(u, v):
+                total_time += self.graph[u][v]['weight']
 
             if (u, v) in self.blocked_edges or (v, u) in self.blocked_edges:
                 continue
@@ -342,10 +349,8 @@ class App(ctk.CTk):
                 x1, y1 = self.positions[u]
                 x2, y2 = self.positions[v]
                 self.canvas.create_line(x1, y1, x2, y2, fill="green", width=3, tags="final_path")
-
-        self.resultPath.configure(
-        text=f"Final Path (green) including detours:\n{' -> '.join(nodes_in_path)}")
-
+        total_time /= 2
+        self.resultPath.configure(text=f"Final Path (green):\n{' -> '.join(nodes_in_path)}\nTime: {round(total_time,2)} min")
 
 app = App()
 app.mainloop()
