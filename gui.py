@@ -28,7 +28,7 @@ class App(ctk.CTk):
         self.frame.grid(row=0, column=0, sticky="n")
         self.frame.grid_propagate(False)
 
-        self.label=ctk.CTkLabel(self.frame, text="Routing - Line B1", font=("Verdana", 16))
+        self.label=ctk.CTkLabel(self.frame, text="Routing - Line B", font=("Verdana", 16))
         self.label.pack(pady=(20, 5))
         self.frame.grid(row=0, column=0)
 
@@ -405,7 +405,7 @@ class App(ctk.CTk):
 
             minutes = int(total_time)
             seconds = int((total_time - minutes) * 60)
-            self.resultPath.configure(text=f"Line B Final Path + Detours\nTime: {minutes} min {seconds} sec")
+            self.resultPath.configure(text=f"Line B Final Path + Detours (green)")
             return
 
         if not hasattr(self, "used_edges") or not self.used_edges:
@@ -426,7 +426,6 @@ class App(ctk.CTk):
             if v not in nodes_in_path:
                 nodes_in_path.append(v)
 
-    # Vizato final path në green
         for u, v in final_edges:
             if u in self.positions and v in self.positions:
                 x1, y1 = self.positions[u]
