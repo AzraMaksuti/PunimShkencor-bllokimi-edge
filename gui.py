@@ -82,8 +82,8 @@ class App(ctk.CTk):
         self.resultPath.pack(padx=10, pady=10)
         self.resultPath.configure(width=200)
 
-        self.linja_b_nodes = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
-        self.linja_b_edges = [("1", "2"), ("2", "3"), ("3", "4"), ("4", "5"), ("5", "6"), ("6", "7"), ("7", "8"), ("8", "9")]
+        self.linja_b_nodes = ["49", "23", "32", "54", "34", "50", "17", "55", "16","15"]
+        self.linja_b_edges = [("49", "23"), ("23", "32"), ("32", "54"), ("54", "34"), ("34", "50"), ("50", "17"), ("17", "55"), ("55", "16")]
 
         self.create_graph_manual()
 
@@ -105,7 +105,7 @@ class App(ctk.CTk):
             )
             for node, (x, y) in pos.items()
         }
-
+        self.line_b_active = False
         self.selected = []
 
         self.draw_graph()
@@ -227,6 +227,29 @@ class App(ctk.CTk):
     def run_a_star(self):
         s = self.start.get().strip()
         e = self.end.get().strip()
+
+        self.canvas.delete("path")
+        self.canvas.delete("line_b_final")
+
+        if getattr(self, "line_b_active", False):
+            path, total_cost = self.compute_line_b_with_detours()
+
+            if not path:
+                self.result.configure(text="No valid Line B path!")
+                return
+
+            self.canvas.delete("path")
+
+            for i in range(len(path) - 1):
+                u, v = path[i], path[i + 1]
+                x1, y1 = self.positions[u]
+                x2, y2 = self.positions[v]
+                self.canvas.create_line(x1, y1, x2, y2, fill="green", width=3, tags="path")
+            minutes = int(total_cost)
+            seconds = int((total_cost - minutes) * 60)
+            self.result.configure(
+                text=f"Line B Detour:\n{' -> '.join(path)} Time: {minutes} min {seconds} sec")
+            return
         if s == "" or e == "":
             self.result.configure(text="Write start & end nodes!")
             return
@@ -237,7 +260,9 @@ class App(ctk.CTk):
         self.canvas.delete("path")
         if path:
             self.draw_path(path, color="blue")
-            self.result.configure(text=f"{' -> '.join(path)} | Time: {round(cost,2)} min")
+            minutes = int(cost)
+            seconds = int((cost - minutes) * 60)
+            self.result.configure(text=f"{' -> '.join(path)} | Time: {minutes} min {seconds} sec")
         else:
             self.result.configure(text="No path")
 
@@ -253,6 +278,7 @@ class App(ctk.CTk):
             self.canvas.create_line(x1, y1, x2, y2, fill=color, width=3, tags="path")
 
     def clear_all(self):
+        self.line_b_active = False
         self.start.delete(0, "end")
         self.end.delete(0, "end")
         self.block_entry.delete(0, "end")
@@ -286,14 +312,27 @@ class App(ctk.CTk):
 
         detour_path, detour_cost = self.a_star(u, v, blocked_edges=self.blocked_edges)
         if detour_path and len(detour_path) > 1:
+            for i in range(len(detour_path)-1):
+                self.used_edges.add((detour_path[i], detour_path[i+1]))
+                self.used_edges.add((detour_path[i+1], detour_path[i]))
             self.draw_path(detour_path, color="orange")
-            self.result.configure(text=f"Detour from {u} to {v}: {' -> '.join(detour_path)} | Time: {round(detour_cost,2)} min")
+            minutes = int(detour_cost)
+            seconds = int((detour_cost - minutes) * 60)
+            self.result.configure(text=f"Detour from {u} to {v}: {' -> '.join(detour_path)} | Time: {minutes} min {seconds} sec ")
         else:
             self.result.configure(text="No alternative path found for this edge")
 
     def highlight_linja_b(self):
-        
+        self.line_b_active = True 
         self.draw_graph()
+
+        total_time = 0
+        counted_edges = set()
+        for u, v in self.linja_b_edges:
+            if (u, v) not in counted_edges and (v, u) not in counted_edges:
+                if self.graph.has_edge(u, v):
+                    total_time += self.graph[u][v]['weight']
+                    counted_edges.add((u,v))
         for circle, node in self.node_items.items():
             if node in self.linja_b_nodes:
                 self.canvas.itemconfig(circle, fill="#3498DB")
@@ -311,8 +350,10 @@ class App(ctk.CTk):
                 x1, y1 = self.positions[u]
                 x2, y2 = self.positions[v]
                 self.canvas.create_line(x1, y1, x2, y2, fill="red", width=3, tags="blocked_edge")
-            
-        self.result.configure(text=f"Line B nodes: {' -> '.join(self.linja_b_nodes)}")
+
+        minutes = int(total_time)
+        seconds = int((total_time - minutes) * 60)  
+        self.result.configure(text=f"Line B nodes: {' -> '.join(self.linja_b_nodes)} | Total Time: {minutes} min {seconds} sec")
 
         if hasattr(self, "used_edges"):
             for u, v in self.used_edges:
@@ -326,31 +367,73 @@ class App(ctk.CTk):
     def final_path(self):
         self.canvas.delete("final_path")
 
+        if getattr(self, "line_b_active", False):
+            total_time = 0
+            nodes_in_path = []
+            final_edges = set()
+
+            for u, v in self.linja_b_edges:
+                if (u, v) in self.blocked_edges or (v, u) in self.blocked_edges:
+                    continue
+                final_edges.add((u, v))
+                total_time += self.graph[u][v]['weight']
+                if u not in nodes_in_path:
+                    nodes_in_path.append(u)
+                if v not in nodes_in_path:
+                    nodes_in_path.append(v)
+
+            for u, v in self.used_edges:
+                if (u, v) not in final_edges and (v, u) not in final_edges:
+                    final_edges.add((u, v))
+                    total_time += self.graph[u][v]['weight']
+                    if u not in nodes_in_path:
+                        nodes_in_path.append(u)
+                    if v not in nodes_in_path:
+                        nodes_in_path.append(v)
+
+            for u, v in final_edges:
+                if u in self.positions and v in self.positions:
+                    x1, y1 = self.positions[u]
+                    x2, y2 = self.positions[v]
+                    self.canvas.create_line(x1, y1, x2, y2, fill="green", width=3, tags="final_path")
+
+            for u, v in self.blocked_edges:
+                if u in self.positions and v in self.positions:
+                    x1, y1 = self.positions[u]
+                    x2, y2 = self.positions[v]
+                    self.canvas.create_line(x1, y1, x2, y2, fill="red", width=3, tags="final_path")
+
+            minutes = int(total_time)
+            seconds = int((total_time - minutes) * 60)
+            self.resultPath.configure(text=f"Line B Final Path + Detours\nTime: {minutes} min {seconds} sec")
+            return
+
         if not hasattr(self, "used_edges") or not self.used_edges:
             self.resultPath.configure(text="No path or detour drawn yet!")
             return
 
         nodes_in_path = []
         total_time = 0
+        final_edges = set()
+
         for u, v in self.used_edges:
-
-            if self.graph.has_edge(u, v):
-                total_time += self.graph[u][v]['weight']
-
             if (u, v) in self.blocked_edges or (v, u) in self.blocked_edges:
                 continue
-
+            final_edges.add((u, v))
+            total_time += self.graph[u][v]['weight']
             if u not in nodes_in_path:
                 nodes_in_path.append(u)
             if v not in nodes_in_path:
                 nodes_in_path.append(v)
 
-            if u < v:
+    # Vizato final path në green
+        for u, v in final_edges:
+            if u in self.positions and v in self.positions:
                 x1, y1 = self.positions[u]
                 x2, y2 = self.positions[v]
                 self.canvas.create_line(x1, y1, x2, y2, fill="green", width=3, tags="final_path")
-        total_time /= 2
-        self.resultPath.configure(text=f"Final Path (green):\n{' -> '.join(nodes_in_path)}\nTime: {round(total_time,2)} min")
-
+        minutes = int(total_time)
+        seconds = int((total_time - minutes) * 60)
+        self.resultPath.configure(text=f"Final Path (green):\n{' -> '.join(nodes_in_path)}\nTime: {minutes} min {seconds} sec")
 app = App()
 app.mainloop()
